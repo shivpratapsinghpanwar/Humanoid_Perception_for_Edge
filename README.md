@@ -45,3 +45,11 @@ it is ever committed.
 |---|---|
 | M0 bootstrap | robot loads, holds HOME, renders from the head camera; tests green |
 | M1 CPU latency census | next |
+
+### M0 — the standing robot
+
+![The standing Tiangong 2 Pro: outside view beside its own head camera, nodding, glancing right and raising an arm through the action stream](docs/media/m0_stand.gif)
+
+Left: an outside view. Right: what the robot's head camera sees at the same moment, the
+image every model in this project will consume. The motion is a scripted sequence through
+the 17-joint action stream (`scripts/make_gif.py`); the camera moves with the head.

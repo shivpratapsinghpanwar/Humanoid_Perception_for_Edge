@@ -1,0 +1,42 @@
+[project]
+name = "humanoid-perception"
+version = "0.1.0"
+description = "CPU-first vision-language-action perception layer for the TerminatorLite humanoid"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  # Exact: the earlier perception simulator measured depth accuracy and rendering on this
+  # version and our camera numbers are inherited from it. Re-run the tests before changing.
+  "mujoco==3.11.0",
+  "numpy>=2.5.2",
+  "pyyaml>=6.0.3",
+  "pillow>=12.3.0",
+]
+
+[project.optional-dependencies]
+# Track A front-end (VLM planner + grounders on CPU): added at M1, not before.
+vlm = []
+# Track B (the VLA trainer and runner): added at M4.
+vla = []
+# Real cameras: added at M6.
+camera = []
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["humanoid_perception*"]
+
+[tool.uv]
+# uv's cache is on C: and this project on D:; hard links cannot cross drives, so copy.
+link-mode = "copy"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["slow: steps physics for many seconds"]

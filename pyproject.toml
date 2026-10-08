@@ -12,13 +12,16 @@ dependencies = [
   "numpy>=2.5.2",
   "pyyaml>=6.0.3",
   "pillow>=12.3.0",
+  "psutil>=7.2.2",
 ]
 
 [project.optional-dependencies]
 # Track A front-end (VLM planner + grounders on CPU): added at M1, not before.
 vlm = []
 # Track B (the VLA trainer and runner): added at M4.
-vla = []
+vla = [
+    "lerobot[smolvla]>=0.4.4",
+]
 # Real cameras: added at M6.
 camera = []
 

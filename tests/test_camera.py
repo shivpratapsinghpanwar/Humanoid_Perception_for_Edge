@@ -1,13 +1,13 @@
-"""The head camera: a generic RGB-D on camera_head_link, looking out of the lens, slightly down."""
+"""The head camera: the Orbbec Gemini E on camera_head_link, looking out of the lens and down."""
 
 import numpy as np
 import pytest
 
 
-def test_intrinsics_follow_the_vertical_fov(sim):
+def test_intrinsics_are_the_gemini_e_datasheet(sim):
     k = sim.camera.intrinsics()
     assert (k.width, k.height) == (640, 480)
-    assert k.fx == pytest.approx(240 / np.tan(np.radians(29.0)), abs=0.05)   # fovy 58 deg
+    assert k.fx == pytest.approx(399.43, abs=0.05)                            # fovy 62 deg
     assert k.fy == k.fx
     assert (k.cx, k.cy) == (319.5, 239.5)
 
@@ -41,8 +41,10 @@ def test_render_gives_rgb_and_metric_depth(sim):
     assert frame.rgb.shape == (480, 640, 3) and frame.rgb.dtype == np.uint8
     assert frame.depth.shape == (480, 640) and frame.depth.dtype == np.float32
     valid = frame.valid
-    assert valid.mean() > 0.3                             # floor and wall ahead are in range
-    assert frame.depth[valid].min() >= 0.2 and frame.depth[valid].max() <= 4.0
+    # From 1.65 m up, looking 30 deg down, the Gemini E's 2.5 m range reaches the floor only
+    # in the lower part of the image; the rest reads 0 = out of range, as the real unit would.
+    assert valid.mean() > 0.2
+    assert frame.depth[valid].min() >= 0.2 and frame.depth[valid].max() <= 2.5
     assert frame.rgb.std() > 10                           # not a blank image
 
 

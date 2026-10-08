@@ -67,8 +67,11 @@ class CameraMount:
     frame: z out of the lens, x right, y down) or ``"ros_link"`` (ROS camera_link: x out
     of the lens, y left, z up). The Tiangong's ``camera_head_link`` is an optical frame.
 
-    Defaults are a generic 640x480 RGB-D depth stream (RealSense D435-class: 58 deg
-    vertical FOV, 0.2-4 m). A real unit's calibration replaces them.
+    Defaults are the Orbbec Gemini E depth stream from its datasheet (v1.1): 640x480,
+    FOV 79 x 62 deg, range 0.2-2.5 m. MuJoCo takes one vertical FOV with square pixels, so
+    horizontal comes out 77.4 deg. The same camera is on every body this project runs on,
+    in simulation and in the lab, so sim images match the real ones; a unit's factory
+    calibration replaces the datasheet numbers when it is read out.
     """
 
     name: str = "head_cam"
@@ -76,9 +79,9 @@ class CameraMount:
     frame: str = "optical"
     width: int = 640
     height: int = 480
-    fovy_deg: float = 58.0
+    fovy_deg: float = 62.0
     min_depth: float = 0.2
-    max_depth: float = 4.0
+    max_depth: float = 2.5
     mount_pos: tuple[float, float, float] = (0.0, 0.0, 0.0)
     mount_rpy_deg: tuple[float, float, float] = (0.0, 0.0, 0.0)
 

@@ -34,7 +34,7 @@ quantised.** Each of those three is a design decision in this plan, not a hope.
 | D2 | **Standing humanoid first.** Base is held: a fixed base in simulation, a gantry on hardware. Navigation comes after. | Decided 2026-10-08. It removes the RL policy from the loop entirely for phase 1 — there is no trained checkpoint for any 30-DoF robot yet — and makes the action space the 17 upper-body joints, the same shape as the arm VLAs that exist in the open. |
 | D3 | **The body is the public Tiangong 2.0 Pro** (Open X-Humanoid URDF release, OpenAtom Open Hardware License 1.0): 30 joints — legs 12, waist 1, head 3, arms 7 + 7 — with a head camera link, an IMU and a with-hands variant. Standing phase: legs locked, pelvis bolted. Our own robot is **not** in the repository; it plugs in privately — and **it is the live test target**: the VLA control is validated on our humanoid in the lab, loaded from `private/`, while the Tiangong is what the open repository and its tests run on. | Decided 2026-10-08 (revised the same day from "our own robot" once the repository was declared public-by-design). Our robot shares the Tiangong's upper-body joint names, so the contract in §3 is written once and nothing in the code changes between the two; `tests/test_private_body.py` runs the same gate on it wherever `private/` exists. See §8. |
 | D4 | Compute order: **CPU i5 → CPU i7 → Jetson Orin Nano last.** No local GPU, ever. Training on Kaggle. | Decided 2026-10-08. Every latency number in this plan is measured on this i5-10210U unless marked otherwise. |
-| D5 | Cameras: Orbbec Gemini E, a USB webcam, the laptop camera — all available. Sim first anyway. | Decided 2026-10-08. The sim gives ground truth; the cameras do not. |
+| D5 | **The camera is the Orbbec Gemini E**, on every body, in simulation and in the lab; webcams only for RGB smoke tests. Sim first anyway. | Decided 2026-10-08. One camera model end to end means sim images and real images share intrinsics, range and failure modes; the sim gives ground truth, the camera does not. |
 | D6 | Licences: commercial-friendly preferred; research-only acceptable for comparison models. | Decided 2026-10-08. Every model below carries its licence (§7). Anything non-commercial is a *comparison* entry, never on the path to the robot. |
 | D7 | Private GitHub repo `Humanoid_Perception_for_Edge` under `shivpratapsinghpanwar`; new `uv` environment, Python 3.12. | Decided 2026-10-08. 3.12 matches the workspace venv; the system Python is 3.10. |
 | D8 | **The VLA never sits inside the 50 Hz control loop.** | Our own measurement on our locomotion work: an unmodelled 45 ms actuation delay took a walking policy from 0 % to **100 % falls**. Perception writes goals into a buffer; the loop never blocks on it. |
@@ -132,7 +132,7 @@ is thrown away when the legs arrive; a second 3-number stream is added beside it
 flowchart LR
   subgraph IN["Observation sources"]
     SIM["MuJoCo head camera<br/>Tiangong 2 Pro, fixed base<br/>640×480 RGB + depth"]
-    CAM["RGB-D camera<br/>webcam / laptop camera"]
+    CAM["Orbbec Gemini E<br/>webcam / laptop camera"]
   end
   subgraph OBS["Observation contract"]
     O["rgb · depth (optional) · q/dq[17]<br/>· instruction text · timestamp"]
@@ -268,7 +268,7 @@ any of these at inference; if one of them gives a real speed-up it is a result i
 | M3 | **Track A end-to-end** | VLM planner + grounder + depth lift + skills, running asynchronously against the 50 Hz sim | success ≥ 80 % on look_at / point_at / nod / wave with held-out phrasings; the control loop never stalls (jitter < 2 ms) while the VLM thinks | 1–1.5 weeks |
 | M4 | **Data engine** | episode recorder → LeRobot v3 dataset from Track A skills with randomisation; Kaggle packaging | ≥ 2 000 episodes rendered on this CPU; dataset loads in LeRobot; a 2-iteration CPU smoke train runs | 3–4 days |
 | M5 | **Track B** | SmolVLA fine-tuned on Kaggle, exported, run on CPU through the async runner; same harness as M3 | side-by-side table A vs B on the suite; B delivers ≥ 10 actions/s to the bus on this i5 | 1–2 weeks incl. Kaggle |
-| M6 | **Real camera** | an RGB-D camera and webcams as observation sources; sim robot mirrors real images. The webcams are RGB-only, so point_at / reach need a depth fallback there: table-plane assumption, object-size prior, or a small monocular depth model on CPU | look_at / point_at at real objects on a real table, robot in sim; latency within 20 % of sim numbers | ~1 week |
+| M6 | **Real camera** | the Gemini E (Orbbec SDK) and webcams as observation sources; sim robot mirrors real images. The webcams are RGB-only, so point_at / reach need a depth fallback there: table-plane assumption, object-size prior, or a small monocular depth model on CPU | look_at / point_at at real objects on a real table, robot in sim; latency within 20 % of sim numbers | ~1 week |
 | M7 | **Optimisation + comparison** | int8/int4, GGUF, caching hypotheses; add one or two comparison VLAs (Evo-1, X-VLA) if they fit Kaggle | each optimisation reported as before/after on the same harness | ongoing |
 | M8 | **Hardware hook** | bus → the robot's joint-target interface for the 17 joints, legs held by the board, gantry; abort on tilt | first gesture on a real robot, amplitude 0.5, base pinned | when a robot is ready |
 | M9 | **Orin Nano** | same stack, CUDA/TensorRT backends | the M5 table re-measured on the Nano | last |
@@ -320,7 +320,7 @@ What the loader adds at load time, never in the files:
 | a standing robot | the 12 leg joints are locked (made fixed) and the pelvis is bolted to the world; the root is raised automatically so the robot's lowest vertex clears the floor by 1 cm | `test_legs_are_locked…`, `test_robot_stands_just_above_the_floor` |
 | no self-collision chatter | robot geoms never collide with each other, only with the world; collision meshes go to a render group the camera never draws | `test_robot_never_collides_with_itself`, `test_collision_meshes_are_in_the_hidden_render_group` |
 | motors | position servos per upper-body joint and the waist; gains are placeholders per torque class; limits are the URDF efforts | `test_motor_torque_limits_are_the_urdf_efforts` |
-| a camera | a MuJoCo `<camera>` on `camera_head_link` with the optical-frame convention; a generic 640×480 RGB-D (fovy 58°, 0.2–4 m) until a real unit's calibration is used | `tests/test_camera.py` |
+| a camera | a MuJoCo `<camera>` on `camera_head_link` with the optical-frame convention, modelled as the **Orbbec Gemini E** (640×480, fovy 62°, fx = fy = 399.43 px, 0.2–2.5 m, datasheet values) — the one camera every body in this project carries, in sim and in the lab | `tests/test_camera.py` |
 | correct frames | static links are not fused, so the camera, IMU and TCP frames survive and the mass is complete | `test_static_links_are_not_fused…`, `test_hand_frames_sit_on_the_hands` |
 
 Arm-versus-head safety is *not* a collision in sim by design (the robot never collides with

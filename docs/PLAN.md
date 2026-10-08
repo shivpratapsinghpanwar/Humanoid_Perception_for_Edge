@@ -377,7 +377,7 @@ transformers, optimum-intel) · `vla` (lerobot) · `camera` (the RGB-D camera's 
 |---|---|
 | venv with torch-cpu + lerobot | ~4 GB |
 | SmolVLA base + fine-tuned checkpoints | ~1 GB each |
-| SmolVLM2 / OWLv2 / OmDet (mostly cached) | ~2 GB new |
+| SmolVLM2 / OWLv2 (mostly cached) | ~2 GB new |
 | one comparison VLA | 2–4 GB each |
 | 2 000 rendered episodes at 640×480, video-encoded | ~5–10 GB |
 | **total before comparisons** | **~15 GB** |
@@ -401,7 +401,7 @@ private remote until the work is ready to open.
 | Track A's VLM picks the wrong skill or object | M3 < 80 % | constrain the output to a JSON schema; fall back to grounder-only for pointing; smaller vocabulary |
 | A private body's joint names do not match the contract | load fails loudly | the by-name contract refuses it; a name map in that body's YAML is the fix, never a code change |
 | Kaggle session dies mid fine-tune | lost hours | checkpoint every 500 steps to a Kaggle dataset, resume |
-| AGPL (YOLOE) leaks into an open release | — | YOLOE only behind a flag; OWLv2/OmDet/D-FINE are the defaults |
+| AGPL (YOLOE) leaks into an open release | — | YOLOE only behind a flag; OWLv2 / D-FINE are the defaults |
 | Hand frame wrong by metres | point_at metric meaningless | the FK-on-mesh test in M0 catches it before any metric exists |
 | Disk runs out during M4 | — | budget in §9; video-encode episodes; prune HF cache (BLIP-large 1.8 GB is unused) |
 

@@ -1,0 +1,17 @@
+Humanoid Perception for Edge
+Copyright 2026 Shivpratap Singh Panwar
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This project builds on, and vendors material from, the following:
+
+- Tiangong 2.0 Pro robot description (assets/robots/tiangong2pro): URDF, meshes and
+  MuJoCo motor classes published by the Beijing Humanoid Robot Innovation Center
+  (Open X-Humanoid) at https://github.com/Open-X-Humanoid/TienKung_URDF, under the
+  OpenAtom Open Hardware License, Version 1.0. The licence text is reproduced in
+  assets/robots/tiangong2pro/LICENCE and the provenance in PROVENANCE.md next to it.
+  Files are unmodified except that one folder name was transliterated to ASCII.
+- MuJoCo (Apache-2.0), https://github.com/google-deepmind/mujoco
+
+Third-party models and datasets used in later milestones carry their own licences; each
+is recorded next to the code that loads it and in docs/BENCHMARKS.md.

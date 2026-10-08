@@ -1,0 +1,37 @@
+# private material: robot designs, hardware notes, anything not publicly available.
+# A private body plugs in through BodyConfig.from_yaml("private/bodies/<name>.yaml").
+private/
+
+# run artefacts
+output/
+logs/
+datasets/
+*.mjb
+MUJOCO_LOG.TXT
+
+# model weights and caches are never committed
+checkpoints/
+*.onnx
+*.pt
+*.safetensors
+*.gguf
+
+# python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# editors and local tool state
+.idea/
+.vscode/
+.claude/
+
+# the task brief this repository was started from
+Instructions.txt
+
+# credentials
+*token*.txt
+kaggle.json

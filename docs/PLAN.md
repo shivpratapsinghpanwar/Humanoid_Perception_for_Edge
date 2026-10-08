@@ -89,7 +89,7 @@ comparison if they fit.
 **Humanoid data.** There is no public dataset in a head-3 + arms-14 joint space. The nearest
 are Unitree's G1 Dex3 sets (14 arm joints + 14 hand, Apache-2.0, no head) and NVIDIA's GR1
 upper-body sim subsets (CC-BY-4.0). **Our training data has to come from our own simulator**,
-which is why Track A exists before Track B (§5).
+which is why the ground-truth data engine (§5) exists before Track B.
 
 ---
 
@@ -137,12 +137,15 @@ flowchart LR
   subgraph OBS["Observation contract"]
     O["rgb · depth (optional) · q/dq[17]<br/>· instruction text · timestamp"]
   end
-  subgraph A["Track A · hierarchical (zero-shot, CPU)"]
-    VLM["VLM planner<br/>SmolVLM2-500M / Moondream2<br/>OpenVINO int8"]
-    GND["open-vocab grounder<br/>OWLv2 · OmDet-Turbo · YOLOE"]
+  subgraph A["Track A · baseline + real-camera bootstrap (zero-shot, CPU)"]
+    PRS["instruction parser<br/>rules; a small VLM only if<br/>paraphrases prove to need it"]
+    GND["open-vocab grounder<br/>OWLv2 (Apache)"]
     D3["depth → 3D target<br/>held in BASE frame<br/>re-perceived every tick"]
     SK["skill library<br/>look_at · point_at · reach · wave · nod"]
-    VLM --> GND --> D3 --> SK
+    PRS --> GND --> D3 --> SK
+  end
+  subgraph GT["Data engine (sim only)"]
+    GTS["simulator ground truth<br/>→ scripted skills → episodes"]
   end
   subgraph B["Track B · monolithic VLA (fine-tuned, CPU)"]
     VLA["SmolVLA, fine-tuned on<br/>our sim rollouts"]
@@ -170,26 +173,30 @@ flowchart LR
   AB --> HW
   AB --> GC
   SIM -. ground truth .-> T
+  SIM -. ground truth .-> GT
   A -. measured .-> T
   B -. measured .-> T
-  SK -. "scripted expert rollouts<br/>= Track B training data" .-> VLA
+  GTS -. "demonstrations<br/>= Track B training data" .-> VLA
 ```
 
 Four rules the diagram encodes:
 
-0. **One system: the VLA covers perception.** In Track B that is literal — one network from
-   pixels and text to the 17-d stream. Track A's grounder, depth lift and base-frame
-   **scene state** (objects with class, confidence, 3D position in the base frame,
-   timestamp) are the zero-shot stand-in for the same function and the data engine that
-   bootstraps Track B — not a separate product handed to the VLA. Modules stay modular so
-   they can be benchmarked and swapped, and every one of them is written here from
-   scratch: nothing is taken from the earlier simulator's perception. The bar is the
-   frontier VLAs; the edge is CPU engineering and novelty (§5.4).
+0. **One system: the VLA is the product and it covers perception.** Track B is literal — one
+   network from pixels and text to the 17-d stream. A vision-language model on its own
+   (SmolVLM, Moondream and the like) outputs text, cannot drive a motor and does not reason
+   about actions; none of them is on the path to the robot. Track A's grounder, depth lift
+   and base-frame **scene state** (objects with class, confidence, 3D position in the base
+   frame, timestamp) exist for two reasons only: a zero-shot **baseline** the VLA has to beat
+   on the same suite, and a **bootstrap on real camera images** before the VLA is trained,
+   where there is no ground truth to lean on. Every module is written here from scratch;
+   nothing is taken from the earlier simulator's perception. The bar is the frontier VLAs;
+   the edge is CPU engineering and novelty (§5.4).
 1. **Two tracks, one bus, one benchmark.** Track A and Track B are interchangeable behind the
    bus and are scored by the same harness. That is how (a) and (b) in D1 become one project.
-2. **Track A is Track B's data source, not its fallback.** Scripted skills with simulator
-   ground truth generate the demonstrations SmolVLA is fine-tuned on. There is no other
-   source of 17-joint humanoid data (§2).
+2. **The data engine is simulator ground truth, not perception.** Scripted skills driven by
+   the simulator's exact object poses generate the demonstrations SmolVLA is fine-tuned on;
+   no VLM and no detector sits in that loop. There is no other source of 17-joint humanoid
+   data (§2).
 3. **The bus is where safety lives.** Limits, rates and self-collision are enforced once, for
    every model, in one place, at runtime.
 
@@ -221,23 +228,24 @@ Metrics recorded for every run: success rate per task, **p50 / p95 latency per t
 machine**, peak RSS, actions per second actually delivered to the bus, number of bus rejections
 (limit / rate / collision), success on held-out phrasings.
 
-### 5.2 Track A — hierarchical, zero-shot
+### 5.2 Track A — the baseline, and the real-camera bootstrap
 
-`instruction + rgb(+depth)` → VLM decides *which skill and which object* (a constrained JSON
-output) → grounder localises the object → depth lifts it to 3D in the base frame → the skill
-generates a min-jerk 17-joint trajectory → bus. Everything open, everything already in the
-Hugging Face cache or Apache-licensed. Expected tick: a few hundred ms for grounding, 1–3 s for
-the VLM; the skill keeps the robot moving between ticks. This is the first thing that works
-end-to-end on the CPU.
+`instruction + rgb + depth` → a **rule-based parser** picks the skill and the object noun
+(the suite is templated, so rules cover it) → an open-vocabulary **grounder** (OWLv2,
+Apache-2.0) localises the object → depth lifts it to 3D in the base frame → the skill
+generates a min-jerk 17-joint trajectory → bus. Expected tick: a few hundred ms for
+grounding; the skill keeps the robot moving between ticks. This is the first loop that works
+end-to-end on the CPU, and it is the yardstick: a VLA that does not beat it has not earned
+its place.
 
-Sequencing inside Track A: because the suite is templated, **v0 parses instructions with
-rules and uses only the grounder** — the first working loop on the CPU does not wait on VLM
-latency. The VLM planner is layered on afterwards for paraphrases and skill choice.
+A small VLM (SmolVLM2, which is also SmolVLA's own backbone) is **not** part of Track A by
+default. It is added only if paraphrase robustness is measured to need it, and then as a
+parser, never as a controller — it emits text, not actions.
 
 ### 5.3 Track B — monolithic, fine-tuned
 
-SmolVLA fine-tuned on Kaggle on episodes recorded from Track A's skills (plus noise and
-randomisation), action = the 17-d stream in 50-step chunks, state = q[17], image = head camera,
+SmolVLA fine-tuned on Kaggle on episodes recorded from the scripted skills driven by simulator
+ground truth (plus noise and randomisation), action = the 17-d stream in 50-step chunks, state = q[17], image = head camera,
 language = the instruction. Runs on the CPU through an async runner: a chunk is requested
 when the queue drops below ~60 %, overlapping chunks are blended. Dataset in LeRobot v3 format
 so the same data can train Evo-1 / X-VLA / MolmoAct2 for comparison without conversion.
@@ -245,7 +253,7 @@ T4 has no bf16: fp16 autocast or fp32 at batch 4–8 with encoders frozen.
 
 ### 5.4 Optimisation track (after both tracks exist)
 
-Known: OpenVINO int8 / int4 weight-only for the VLM and grounder; `vla.cpp` GGUF Q8/Q4 for
+Known: OpenVINO int8 / int4 weight-only for SmolVLA's backbone and the grounder; `vla.cpp` GGUF Q8/Q4 for
 SmolVLA if it builds on Windows; ONNX Runtime
 as the ARM fallback. **Audit every int8 export** — one published SmolVLA "int8" artefact turned
 out to be a byte-identical fp32 graph.
@@ -263,9 +271,9 @@ any of these at inference; if one of them gives a real speed-up it is a result i
 | # | Milestone | Deliverable | Gate (measured, not asserted) | Effort |
 |---|---|---|---|---|
 | M0 | **Bootstrap** | repo, `uv` env, the Tiangong 2 Pro vendored with provenance, licence and hash manifest, loader (legs locked, pelvis bolted with automatic floor clearance, mimics as constraints when a body has them), head `<camera>` on `camera_head_link`, PD holds HOME, first rendered frame, pytest | robot holds HOME for 60 s, drift < 1°; render 640×480 RGB+depth from the head camera; each TCP where the URDF puts it; tests green | 1–2 days |
-| M1 | **CPU latency census** | `docs/BENCHMARKS.md` with p50/p95 and RSS on this i5 for: SmolVLA-base (latency probe only — its actions mean nothing on our body), SmolVLM2-256M/500M, Moondream2, OWLv2, OmDet-Turbo, YOLOE; fp32 vs OpenVINO int8 vs GGUF where available | numbers exist for every row; Track B's async parameters (chunk size, request threshold) chosen from the measured SmolVLA p50 | 2–3 days |
+| M1 | **CPU latency census** | `docs/BENCHMARKS.md` with p50/p95 and RSS on this i5, in this order: **SmolVLA-base first** (a latency probe — its actions mean nothing on our body — but the one number that can change the architecture), then SmolVLM2-500M (measured only because it is the backbone inside SmolVLA, so its cost is the VLA's floor), then the grounders OWLv2 and YOLOE; fp32 vs OpenVINO int8 vs GGUF where available | numbers exist for every row; Track B's async parameters (chunk size, request threshold) chosen from the measured SmolVLA p50 | 2–3 days |
 | M2 | **World + task suite + bus** | table scene, object vocabulary, randomiser, ground-truth API, the six tasks and their metrics, the Action Bus with limits / rate / FK self-collision | a scripted oracle (uses ground truth directly) scores ~100 % on all tasks through the bus; a deliberately bad trajectory is rejected by the bus | 3–4 days |
-| M3 | **Track A end-to-end** | VLM planner + grounder + depth lift + skills, running asynchronously against the 50 Hz sim | success ≥ 80 % on look_at / point_at / nod / wave with held-out phrasings; the control loop never stalls (jitter < 2 ms) while the VLM thinks | 1–1.5 weeks |
+| M3 | **Track A end-to-end (the baseline)** | rule parser + grounder + depth lift + skills, running asynchronously against the 50 Hz sim | success ≥ 80 % on look_at / point_at / nod / wave on the templated suite; the control loop never stalls (jitter < 2 ms) while the grounder runs. Held-out paraphrases are the VLA's exam (M5), not the baseline's | 1 week |
 | M4 | **Data engine** | episode recorder → LeRobot v3 dataset from Track A skills with randomisation; Kaggle packaging | ≥ 2 000 episodes rendered on this CPU; dataset loads in LeRobot; a 2-iteration CPU smoke train runs | 3–4 days |
 | M5 | **Track B** | SmolVLA fine-tuned on Kaggle, exported, run on CPU through the async runner; same harness as M3 | side-by-side table A vs B on the suite; B delivers ≥ 10 actions/s to the bus on this i5 | 1–2 weeks incl. Kaggle |
 | M6 | **Real camera** | the Gemini E (Orbbec SDK) and webcams as observation sources; sim robot mirrors real images. The webcams are RGB-only, so point_at / reach need a depth fallback there: table-plane assumption, object-size prior, or a small monocular depth model on CPU | look_at / point_at at real objects on a real table, robot in sim; latency within 20 % of sim numbers | ~1 week |
@@ -292,12 +300,9 @@ never on the path to the robot.
 | VLA (comparison) | Octo-Small | 27 M | MIT | the only one fast enough for a synchronous tick on CPU; language quality unverified |
 | VLA (reference only) | GR00T N1.7 | 3 B | NVIDIA Open Model | commercially fine, ships Unitree G1 tags, CPU-competitive — but 40 GB to fine-tune, 16 GB to run. Not for Kaggle |
 | VLA (reference only) | π0.5 | 3.3 B | Gemma terms | > 22 GB LoRA; 8.6 s/query on an i5-12400F |
-| VLM planner | **SmolVLM2-500M** (and 256M) | 0.5 B | Apache-2.0 | OpenVINO 8-bit via optimum-intel; the cache holds SmolVLM v1 256M, so v2 is a new download |
-| VLM planner (alt) | Moondream2 | ~1.9 B | **verify** before use | already cached (3.7 GB); good grounding; slower. Licence not checked this round — D6 makes it load-bearing |
-| VLM planner (alt) | Qwen3-VL-2B | 2 B | Apache-2.0 | on the OpenVINO GenAI validated list |
-| grounder | **OWLv2 base** | 0.2 B | Apache-2.0 | cached; open vocabulary |
-| grounder | OmDet-Turbo tiny | 0.1 B | Apache-2.0 | cached; ONNX export reported difficult |
-| grounder | YOLOE-26n/s | 4–11 M | **AGPL-3.0** | fastest by far; prompts baked at export. AGPL is fine while private, a problem if this is opened with proprietary consumers — flagged |
+| VLA backbone (measured, never a planner) | SmolVLM2-500M | 0.5 B | Apache-2.0 | the vision-language model *inside* SmolVLA; measured in M1 because its CPU cost is the VLA's floor. A VLM alone emits text, not actions, so it is not a candidate controller. Would serve as an instruction parser only if paraphrases prove to need one |
+| grounder (baseline) | **OWLv2 base** | 0.2 B | Apache-2.0 | cached; open vocabulary; the default for Track A |
+| grounder (speed comparison) | YOLOE-26n/s | 4–11 M | **AGPL-3.0** | fastest by far; prompts baked at export. AGPL is a problem for a public repository with proprietary consumers — behind a flag, never the default |
 | closed-set detector | D-FINE / DEIM | 4–60 M | Apache-2.0 | fine-tune to our object vocabulary if open-vocab is too slow; exports to OpenVINO cleanly |
 | inference engines | OpenVINO, ONNX Runtime, `vla.cpp` (ggml) | — | Apache-2.0 | OpenVINO for x86 now; ORT as the ARM fallback; `vla.cpp` if it builds on Windows |
 

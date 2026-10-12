@@ -1,4 +1,4 @@
-# Humanoid Perception for Edge — a CPU-first vision-language-action layer for TerminatorLite
+# Humanoid Perception for Edge — a CPU-first vision-language-action layer for humanoids (reference robot: Tiangong 2 Pro)
 
 Status: **approved 2026-10-08; M0 built.** Written 2026-10-08.
 Companion work, both private and both structure references only: a locomotion training
@@ -14,7 +14,7 @@ through a gitignored `private/` folder (§9).
 
 ## 0. In one sentence
 
-Give TerminatorLite eyes and ears that run on a laptop CPU: a camera, a language instruction and a
+Give the reference robot, the Tiangong 2 Pro, eyes and ears that run on a laptop CPU: a camera, a language instruction and a
 small open model in, a smooth stream of upper-body joint targets out — first on a standing
 robot in MuJoCo, then on the real camera, then on the real robot, and only at the very end
 on a Jetson.
@@ -30,7 +30,7 @@ quantised.** Each of those three is a design decision in this plan, not a hope.
 
 | # | Decision | Reason |
 |---|---|---|
-| D1 | Both goals at once: **(a)** benchmark open VLAs on CPU, **(b)** build a VLA that drives TerminatorLite. | Decided 2026-10-08. (a) alone cannot move TerminatorLite — every public VLA is trained on another embodiment and no humanoid dataset in our joint space exists (§7). (b) without (a) has no numbers. |
+| D1 | Both goals at once: **(a)** benchmark open VLAs on CPU, **(b)** build a VLA that drives the reference robot, the Tiangong 2 Pro. | Decided 2026-10-08. (a) alone cannot move it — every public VLA is trained on another embodiment and no humanoid dataset in our joint space exists (§7). (b) without (a) has no numbers. |
 | D2 | **Standing humanoid first.** Base is held: a fixed base in simulation, a gantry on hardware. Navigation comes after. | Decided 2026-10-08. It removes the RL policy from the loop entirely for phase 1 — there is no trained checkpoint for any 30-DoF robot yet — and makes the action space the 17 upper-body joints, the same shape as the arm VLAs that exist in the open. |
 | D3 | **The body is the public Tiangong 2.0 Pro** (Open X-Humanoid URDF release, OpenAtom Open Hardware License 1.0): 30 joints — legs 12, waist 1, head 3, arms 7 + 7 — with a head camera link, an IMU and a with-hands variant. Standing phase: legs locked, pelvis bolted. Our own robot is **not** in the repository; it plugs in privately — and **it is the live test target**: the VLA control is validated on our humanoid in the lab, loaded from `private/`, while the Tiangong is what the open repository and its tests run on. | Decided 2026-10-08 (revised the same day from "our own robot" once the repository was declared public-by-design). Our robot shares the Tiangong's upper-body joint names, so the contract in §3 is written once and nothing in the code changes between the two; `tests/test_private_body.py` runs the same gate on it wherever `private/` exists. See §8. |
 | D4 | Compute order: **CPU i5 → CPU i7 → Jetson Orin Nano last.** No local GPU, ever. Training on Kaggle. | Decided 2026-10-08. Every latency number in this plan is measured on this i5-10210U unless marked otherwise. |
@@ -38,7 +38,7 @@ quantised.** Each of those three is a design decision in this plan, not a hope.
 | D6 | Licences: commercial-friendly preferred; research-only acceptable for comparison models. | Decided 2026-10-08. Every model below carries its licence (§7). Anything non-commercial is a *comparison* entry, never on the path to the robot. |
 | D7 | Private GitHub repo `Humanoid_Perception_for_Edge` under `shivpratapsinghpanwar`; new `uv` environment, Python 3.12. | Decided 2026-10-08. 3.12 matches the workspace venv; the system Python is 3.10. |
 | D8 | **The VLA never sits inside the 50 Hz control loop.** | Our own measurement on our locomotion work: an unmodelled 45 ms actuation delay took a walking policy from 0 % to **100 % falls**. Perception writes goals into a buffer; the loop never blocks on it. |
-| D9 | Our own humanoid is called **TerminatorLite** in prose only. Joint and body names are **not** renamed from the URDFs, and no code carries a robot's name. | Renaming joints breaks any downstream controller that resolves joints by name; keeping names out of code makes a rename a documentation edit. |
+| D9 | **The Tiangong 2 Pro is the reference robot** and the only robot the documents name; hardware that runs the same contract may carry another name, which does not appear here. Joint and body names are **not** renamed from the URDFs, and no code carries a robot's name. | Decided 2026-10-12. Renaming joints breaks any downstream controller that resolves joints by name; keeping names out of code makes a rename a documentation edit. |
 | D10 | **The VLA covers perception.** Vision, language and action are one system here; there is no separate "perception module" handed to a VLA. The earlier bench's perception (a detector plus depth refinement) was a deliberate, primitive stop-gap and is **not inherited** — the sibling projects are structure references only. The bar is the frontier labs' VLAs; what this project competes on is edge (CPU) engineering and novelty, not redoing the simple version. | Decided 2026-10-08. What *is* reused is simulation plumbing only: how a ROS URDF is loaded into MuJoCo without being silently wrong (§8). |
 | D11 | **Public by design.** Only publicly available data goes into the repository: the Tiangong 2.0 Pro and open models. Our robot's URDF, meshes, gains and hardware notes live in the gitignored `private/` folder and are purged from git history. | Decided 2026-10-08. The edge-VLA work is meant to be open-sourced so others can use it; the robot design is not. |
 

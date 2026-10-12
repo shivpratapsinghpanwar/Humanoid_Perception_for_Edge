@@ -20,6 +20,18 @@ def test_measure_excludes_warmup_and_reports_percentiles():
     assert len(t.samples_ms) == 10
 
 
+def test_battery_moment_during_a_run_makes_it_unpublishable():
+    import dataclasses
+    s = dataclasses.replace(machine.capture(), on_ac_power=True)
+    assert s.publishable
+    s.power_interrupted = True           # what census.py sets when PowerWatch saw a battery sample
+    assert not s.publishable and s.to_dict()["publishable"] is False
+    with machine.PowerWatch(every_s=0.05) as w:
+        import time
+        time.sleep(0.2)
+    assert w.samples >= 1 or w.battery_samples == 0   # desktops report no battery at all
+
+
 def test_machine_state_captures_power_and_clock():
     s = machine.capture()
     assert s.python and s.timestamp_utc.endswith("+00:00")

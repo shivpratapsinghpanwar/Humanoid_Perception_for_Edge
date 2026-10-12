@@ -33,11 +33,13 @@ class MachineState:
     git_revision: str | None
     timestamp_utc: str
     notes: dict = field(default_factory=dict)
+    #: True when a PowerWatch saw the machine on battery at any moment during the run.
+    power_interrupted: bool = False
 
     @property
     def publishable(self) -> bool:
-        """A number is publishable only when the machine was on mains power."""
-        return self.on_ac_power is True
+        """A number is publishable only when the machine was on mains power for the whole run."""
+        return self.on_ac_power is True and not self.power_interrupted
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -104,3 +106,46 @@ def capture(notes: dict | None = None) -> MachineState:
         git_revision=_git_revision(), timestamp_utc=_dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
         notes=dict(notes or {}),
     )
+
+
+class PowerWatch:
+    """Polls the power source on a side thread for the length of a run.
+
+    Checking only at the start and the end misses a charger that drops out mid-run and comes
+    back (it happened on 2026-10-12: unplugged 19 minutes into a SmolVLA run). Any battery
+    sample marks the run's machine state ``power_interrupted``, which makes it unpublishable.
+    """
+
+    def __init__(self, every_s: float = 5.0):
+        import threading
+
+        self.every_s = every_s
+        self.samples = 0
+        self.battery_samples = 0
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def _run(self) -> None:
+        try:
+            import psutil
+        except Exception:
+            return
+        while not self._stop.wait(self.every_s):
+            batt = psutil.sensors_battery()
+            if batt is None:
+                continue
+            self.samples += 1
+            if not batt.power_plugged:
+                self.battery_samples += 1
+
+    @property
+    def saw_battery(self) -> bool:
+        return self.battery_samples > 0
+
+    def __enter__(self) -> "PowerWatch":
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self._stop.set()
+        self._thread.join(timeout=10)

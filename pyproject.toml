@@ -1,7 +1,7 @@
 [project]
 name = "humanoid-perception"
 version = "0.1.0"
-description = "CPU-first vision-language-action perception layer for the TerminatorLite humanoid"
+description = "CPU-first vision-language-action perception layer for humanoids (reference robot: Tiangong 2 Pro)"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.12,<3.13"

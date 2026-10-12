@@ -39,13 +39,16 @@ def cmd_run(args: argparse.Namespace) -> int:
         return 2
     import torch
     torch.set_num_threads(args.threads)
-    result = spec.run(n=args.n, warmup=args.warmup, threads=args.threads, precision=args.precision)
-    result.machine = machine_state.capture()
+    with machine_state.PowerWatch() as power:
+        result = spec.run(n=args.n, warmup=args.warmup, threads=args.threads, precision=args.precision)
+    result.machine = machine_state.capture(
+        notes={"power_samples": power.samples, "battery_samples": power.battery_samples})
+    result.machine.power_interrupted = power.saw_battery
     path = result.save(RESULTS_DIR)
     t = result.timing
     print(f"{result.model} {result.runtime} {result.precision} t{result.threads}: "
           f"p50 {t.p50_ms:.0f} ms, p95 {t.p95_ms:.0f} ms, n {t.n}, peak RSS {result.peak_rss_mb and round(result.peak_rss_mb)} MB"
-          f"{'' if result.machine.publishable else '  [ON BATTERY - not publishable]'}  -> {path}")
+          f"{'' if result.machine.publishable else '  [ON BATTERY during the run - not publishable]'}  -> {path}")
     return 0
 
 

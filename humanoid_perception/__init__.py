@@ -1,4 +1,4 @@
-"""Humanoid Perception for Edge: a CPU-first vision-language-action layer for TerminatorLite.
+"""Humanoid Perception for Edge: a CPU-first vision-language-action layer for humanoids (reference robot: Tiangong 2 Pro).
 
 The one contract everything here agrees on is ``humanoid_perception.robot.contract``: a
 17-number upper-body action stream, resolved by joint name against whichever body is

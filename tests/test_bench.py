@@ -60,7 +60,8 @@ def test_results_round_trip_and_render(tmp_path):
     assert [r["model"] for r in loaded] == ["alpha", "beta"]
     assert json.loads(p1.read_text())["machine"]["publishable"] is True
     md = results.render_markdown(loaded)
-    main_table = md.split("## Runs taken on battery")[0]
+    main_table = md.split("## Runs with battery power during the run")[0]
+    assert "clock MHz" not in md                             # idle clock readings are not published
     assert "| alpha |" in main_table and "**250**" in main_table
     assert "| beta |" not in main_table                    # battery runs never enter the main table
     assert "| beta |" in md                                # but they are listed

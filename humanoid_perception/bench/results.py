@@ -60,32 +60,36 @@ def render_markdown(results: list[dict]) -> str:
     lines = ["# CPU latency census", ""]
     lines += ["Every row below was produced by `scripts/census.py` and read back from",
               "`benchmarks/census/*.json`; nothing here is typed by hand. The quantity timed is named",
-              "per row. SmolVLA's actions mean nothing on our body — its row is a latency probe.", ""]
+              "per row. SmolVLA's actions mean nothing on our body — its row is a latency probe.",
+              "Precision is the dtype the weights actually ran in, checked at run time. A row is",
+              "publishable only if the machine stayed on mains power for the whole run (sampled every 5 s).",
+              "No clock is shown: Windows' clock counters report idle or package-average values that",
+              "say nothing about the clock under load.", ""]
     if pub:
         m = pub[0]["machine"]
         lines += ["## Machine", "",
                   f"- {m.get('cpu') or 'CPU'} — {m.get('cores_physical')} cores / {m.get('cores_logical')} threads, "
-                  f"max {m.get('cpu_mhz_max')} MHz, {round(m.get('ram_gb') or 0, 1)} GB RAM, {m.get('os')}",
+                  f"{round(m.get('ram_gb') or 0, 1)} GB RAM, {m.get('os')}",
                   f"- Python {m.get('python')}, torch {m.get('torch')}", ""]
     lines += ["## Results (mains power)", "",
-              "| model | role | runtime | precision | threads | timed quantity | p50 ms | p95 ms | mean ms | n | peak RSS MB | clock MHz | date (UTC) | git |",
-              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "| model | role | runtime | precision | threads | timed quantity | p50 ms | p95 ms | mean ms | n | peak RSS MB | date (UTC) | git |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in pub:
         t, m = r["timing"], r["machine"]
         lines.append(f"| {r['model']} | {r['role']} | {r['runtime']} | {r['precision']} | {r['threads']} | "
                      f"{r['what_is_timed']} | **{t['p50_ms']:.0f}** | {t['p95_ms']:.0f} | {t['mean_ms']:.0f} | {t['n']} | "
-                     f"{'' if r['peak_rss_mb'] is None else round(r['peak_rss_mb'])} | {m.get('cpu_mhz_now')} | "
+                     f"{'' if r['peak_rss_mb'] is None else round(r['peak_rss_mb'])} | "
                      f"{m.get('timestamp_utc', '')[:10]} | {m.get('git_revision') or ''} |")
     if not pub:
-        lines.append("| — | no publishable run yet | | | | | | | | | | | | |")
+        lines.append("| — | no publishable run yet | | | | | | | | | | | |")
     if unpub:
-        lines += ["", "## Runs taken on battery (recorded, not publishable)", "",
-                  "| model | runtime | precision | threads | p50 ms | clock MHz | battery % | date |",
-                  "|---|---|---|---|---|---|---|---|"]
+        lines += ["", "## Runs with battery power during the run (recorded, not publishable)", "",
+                  "| model | runtime | precision | threads | p50 ms | battery % | date |",
+                  "|---|---|---|---|---|---|---|"]
         for r in unpub:
             t, m = r["timing"], r["machine"]
             lines.append(f"| {r['model']} | {r['runtime']} | {r['precision']} | {r['threads']} | {t['p50_ms']:.0f} | "
-                         f"{m.get('cpu_mhz_now')} | {m.get('battery_percent')} | {m.get('timestamp_utc', '')[:10]} |")
+                         f"{m.get('battery_percent')} | {m.get('timestamp_utc', '')[:10]} |")
     lines += ["", "## Sources and licences", "", "| model | source | revision | licence |", "|---|---|---|---|"]
     seen = set()
     for r in results:

@@ -38,10 +38,15 @@ def _load():
     from lerobot.policies.factory import make_pre_post_processors
     from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
 
+    import torch
+
     path = str(fetch(REPO))
     policy = SmolVLAPolicy.from_pretrained(path)
     policy.config.device = "cpu"
-    policy.to("cpu").eval()
+    # The checkpoint loads in bfloat16. This CPU (AVX2, no AVX512-BF16/AMX) has no bf16
+    # arithmetic, so PyTorch emulates it: measured 66-77 s per chunk in bf16 versus ~8 s in fp32
+    # (2026-10-13). fp32 is what anyone deploys on such a CPU, so the census casts to it.
+    policy.to(device="cpu", dtype=torch.float32).eval()
     pre, post = make_pre_post_processors(
         policy_cfg=policy.config, pretrained_path=path,
         preprocessor_overrides={"device_processor": {"device": "cpu"}},
@@ -86,6 +91,9 @@ def run(n: int = 20, warmup: int = 3, threads: int = 4, precision: str = "fp32")
     policy, pre, post = _load()
     load_s = time.perf_counter() - t0
     config = policy.config
+    weight_dtypes = sorted({str(p.dtype) for p in policy.parameters()})
+    if weight_dtypes != ["torch.float32"]:
+        raise RuntimeError(f"precision says fp32 but the weights are {weight_dtypes}")
     obs, image_keys, state_dim = _raw_observation(config, rgb)
 
     def full():
@@ -120,6 +128,7 @@ def run(n: int = 20, warmup: int = 3, threads: int = 4, precision: str = "fp32")
                      "resize_imgs_with_padding": list(getattr(config, "resize_imgs_with_padding", ()) or [])},
         timing=timing, peak_rss_mb=peak_rss_mb(), machine=capture(),
         extra={"model_only_ms": timing_model.to_dict(), "load_seconds": round(load_s, 1),
+               "weight_dtypes": weight_dtypes, "checkpoint_dtype": "bfloat16 (cast to fp32 on load)",
                "vlm_backbone": getattr(config, "vlm_model_name", None), "torch": torch.__version__,
                "parallel_info": torch.__config__.parallel_info().splitlines()[:6]},
     )

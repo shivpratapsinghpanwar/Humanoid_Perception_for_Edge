@@ -30,6 +30,16 @@ def test_safety_filter_rate_limits_each_step():
     assert f.rate_limited == 10
 
 
+def test_upsample_is_the_recorders_linear_executor():
+    from humanoid_perception.vla.smolvla import upsample
+    a = np.array([[0.0, 10.0], [1.0, 10.0], [1.0, 0.0]])
+    u = upsample(a, 5)
+    assert u.shape == (11, 2)
+    assert np.allclose(u[:6, 0], [0.0, 0.2, 0.4, 0.6, 0.8, 1.0])   # a0 + (a1 - a0) * j / 5, then a1
+    assert np.allclose(u[5:, 1], [10.0, 8.0, 6.0, 4.0, 2.0, 0.0])
+    assert np.allclose(upsample(a[:1], 5), a[:1])
+
+
 def _red_pixels(body: BodyConfig) -> int:
     sim = StandingSim(WorldConfig(body=body, table=TableConfig()))
     try:

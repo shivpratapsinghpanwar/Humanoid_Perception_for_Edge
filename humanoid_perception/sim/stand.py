@@ -29,15 +29,48 @@ CONTROL_HZ = 50.0
 
 
 @dataclass
+class TableConfig:
+    """A plain table in front of the robot with one red cup on it (positions in the world
+    frame, x forward from the robot's root, metres). Static geometry: nothing on it moves."""
+
+    center: tuple[float, float] = (0.60, 0.0)
+    size: tuple[float, float] = (0.6, 1.0)       # depth (x), width (y)
+    height: float = 0.75                         # top surface above the floor
+    # 0.70 m out keeps the cup well inside the head camera's view on both bodies (a taller
+    # robot with a 30 deg-down camera saw a cup at 0.55 m only at the bottom edge).
+    cup: tuple[float, float] | None = (0.70, 0.05)
+    cup_radius: float = 0.04
+    cup_height: float = 0.10
+
+
+@dataclass
 class WorldConfig:
     timestep: float = 0.002
     room: bool = True            # floor and three walls, so the background has real depth
     room_size: float = 3.0       # half-extent of the floor, metres
     body: BodyConfig | None = None
+    table: TableConfig | None = None   # None = empty room (the M0 world)
 
     def __post_init__(self):
         if self.body is None:
             self.body = BodyConfig()
+
+
+def add_table(spec: mujoco.MjSpec, t: TableConfig) -> None:
+    top = 0.02
+    (cx, cy), (dx, dy) = t.center, t.size
+    spec.worldbody.add_geom(name="table_top", type=mujoco.mjtGeom.mjGEOM_BOX,
+                            pos=[cx, cy, t.height - top], size=[dx / 2, dy / 2, top],
+                            rgba=[0.62, 0.47, 0.32, 1.0], contype=1, conaffinity=1)
+    leg_h = (t.height - 2 * top) / 2
+    spec.worldbody.add_geom(name="table_pedestal", type=mujoco.mjtGeom.mjGEOM_BOX,
+                            pos=[cx, cy, leg_h], size=[0.06, 0.06, leg_h],
+                            rgba=[0.35, 0.30, 0.25, 1.0], contype=1, conaffinity=1)
+    if t.cup is not None:
+        spec.worldbody.add_geom(name="cup", type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                                pos=[t.cup[0], t.cup[1], t.height + t.cup_height / 2],
+                                size=[t.cup_radius, t.cup_height / 2, 0],
+                                rgba=[0.85, 0.08, 0.08, 1.0], contype=1, conaffinity=1)
 
 
 def build_world(cfg: WorldConfig) -> tuple[mujoco.MjSpec, BodyInfo]:
@@ -69,6 +102,9 @@ def build_world(cfg: WorldConfig) -> tuple[mujoco.MjSpec, BodyInfo]:
         ):
             spec.worldbody.add_geom(name=name, type=mujoco.mjtGeom.mjGEOM_BOX, pos=pos, size=size,
                                     rgba=[0.80, 0.80, 0.78, 1.0], contype=1, conaffinity=1)
+
+    if cfg.table is not None:
+        add_table(spec, cfg.table)
 
     info = attach_body(spec, cfg.body)
     add_mounted_camera(spec, cfg.body.camera)

@@ -24,7 +24,7 @@ import time
 
 import numpy as np
 
-from ..checkpoints import fetch, revision_of
+from ..checkpoints import revision_of
 from ..machine import capture
 from ..results import CensusResult
 from ..timing import measure, peak_rss_mb
@@ -34,24 +34,14 @@ INSTRUCTION = "look at the red cup"
 
 
 def _load():
-    """Policy + its pre/post-processors, exactly as lerobot_eval.py builds them, on the CPU."""
-    from lerobot.policies.factory import make_pre_post_processors
-    from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
+    """Policy + its pre/post-processors, exactly as lerobot_eval.py builds them, on the CPU.
 
-    import torch
+    The checkpoint loads in bfloat16. This CPU (AVX2, no AVX512-BF16/AMX) has no bf16
+    arithmetic, so PyTorch emulates it: measured 66-77 s per chunk in bf16 versus ~10 s in
+    fp32 (2026-10-13). fp32 is what anyone deploys on such a CPU, so the loader casts to it."""
+    from ...vla.smolvla import load_smolvla
 
-    path = str(fetch(REPO))
-    policy = SmolVLAPolicy.from_pretrained(path)
-    policy.config.device = "cpu"
-    # The checkpoint loads in bfloat16. This CPU (AVX2, no AVX512-BF16/AMX) has no bf16
-    # arithmetic, so PyTorch emulates it: measured 66-77 s per chunk in bf16 versus ~8 s in fp32
-    # (2026-10-13). fp32 is what anyone deploys on such a CPU, so the census casts to it.
-    policy.to(device="cpu", dtype=torch.float32).eval()
-    pre, post = make_pre_post_processors(
-        policy_cfg=policy.config, pretrained_path=path,
-        preprocessor_overrides={"device_processor": {"device": "cpu"}},
-    )
-    return policy, pre, post
+    return load_smolvla(REPO)
 
 
 def _raw_observation(config, rgb: np.ndarray) -> tuple[dict, list[str], int]:

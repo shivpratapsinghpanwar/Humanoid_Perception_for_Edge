@@ -1,0 +1,139 @@
+{
+  "model": "smolvla_base",
+  "role": "vla",
+  "source": "lerobot/smolvla_base",
+  "revision": "5e8d12a",
+  "licence": "Apache-2.0",
+  "runtime": "torch-cpu",
+  "precision": "fp32",
+  "threads": 4,
+  "what_is_timed": "observation -> 50-action chunk, LeRobot pre/post-processors included",
+  "input_shape": {
+    "image_hw": [
+      480,
+      640
+    ],
+    "image_keys": [
+      "observation.images.camera1",
+      "observation.images.camera2",
+      "observation.images.camera3"
+    ],
+    "state_dim": 6,
+    "instruction": "look at the red cup",
+    "chunk_shape": [
+      1,
+      50,
+      6
+    ],
+    "chunk_size": 50,
+    "n_action_steps": 50,
+    "flow_steps": 10,
+    "resize_imgs_with_padding": [
+      512,
+      512
+    ]
+  },
+  "timing": {
+    "n": 20,
+    "warmup": 3,
+    "p50_ms": 9618.82,
+    "p95_ms": 11546.02,
+    "mean_ms": 10085.32,
+    "min_ms": 9047.67,
+    "max_ms": 15429.74,
+    "samples_ms": [
+      9810.07,
+      9364.19,
+      9253.44,
+      9535.08,
+      9905.23,
+      9702.56,
+      10318.0,
+      9810.07,
+      11052.87,
+      11213.35,
+      11546.02,
+      10841.78,
+      9220.76,
+      15429.74,
+      9216.45,
+      9203.63,
+      9081.44,
+      9067.57,
+      9047.67,
+      9086.45
+    ]
+  },
+  "peak_rss_mb": 6664.474624,
+  "machine": {
+    "hostname": "AIML-SHIVPRATAP",
+    "os": "Windows 11",
+    "cpu": "Intel64 Family 6 Model 142 Stepping 12, GenuineIntel",
+    "cores_physical": 4,
+    "cores_logical": 8,
+    "cpu_mhz_now": 804.0,
+    "cpu_mhz_max": 2112.0,
+    "ram_gb": 16.918601728,
+    "on_ac_power": true,
+    "battery_percent": 100.0,
+    "python": "3.12.13",
+    "torch": "2.10.0+cpu",
+    "torch_threads": 4,
+    "git_revision": "3a82f18",
+    "timestamp_utc": "2026-10-13T04:36:12+00:00",
+    "notes": {
+      "power_samples": 102,
+      "battery_samples": 0
+    },
+    "power_interrupted": false,
+    "publishable": true
+  },
+  "extra": {
+    "model_only_ms": {
+      "n": 20,
+      "warmup": 1,
+      "p50_ms": 9413.71,
+      "p95_ms": 11089.39,
+      "mean_ms": 9676.06,
+      "min_ms": 9084.65,
+      "max_ms": 11279.02,
+      "samples_ms": [
+        9102.17,
+        9148.26,
+        9137.76,
+        9167.34,
+        9084.65,
+        9248.84,
+        9395.58,
+        9312.8,
+        9516.17,
+        9447.38,
+        9098.44,
+        9122.92,
+        9431.85,
+        11279.02,
+        11089.39,
+        10384.65,
+        10338.68,
+        9694.81,
+        10362.51,
+        10158.02
+      ]
+    },
+    "load_seconds": 27.8,
+    "weight_dtypes": [
+      "torch.float32"
+    ],
+    "checkpoint_dtype": "bfloat16 (cast to fp32 on load)",
+    "vlm_backbone": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+    "torch": "2.10.0+cpu",
+    "parallel_info": [
+      "ATen/Parallel:",
+      "\tat::get_num_threads() : 4",
+      "\tat::get_num_interop_threads() : 4",
+      "OpenMP 2019",
+      "\tomp_get_max_threads() : 4",
+      "Intel(R) oneAPI Math Kernel Library Version 2025.3-Product Build 20251007 for Intel(R) 64 architecture applications"
+    ]
+  }
+}

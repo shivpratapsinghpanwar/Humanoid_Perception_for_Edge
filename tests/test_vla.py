@@ -39,6 +39,23 @@ def _red_pixels(body: BodyConfig) -> int:
     return int(np.count_nonzero((rgb[..., 0] > 150) & (rgb[..., 1] < 60) & (rgb[..., 2] < 60)))
 
 
+def test_table_objects_rest_on_the_table():
+    from humanoid_perception.sim.stand import SceneObject
+    import mujoco
+    objs = (SceneObject("box", "box", (0.04, 0.06, 0.05), (0.1, 0.2, 0.9, 1.0), (0.6, -0.2)),
+            SceneObject("bottle", "cylinder", (0.035, 0.11, 0.0), (0.1, 0.7, 0.2, 1.0), (0.65, 0.2)))
+    sim = StandingSim(WorldConfig(table=TableConfig(objects=objs)))
+    try:
+        for o, half_h in zip(objs, (0.05, 0.11)):
+            g = mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_GEOM, f"obj_{o.name}")
+            assert g >= 0
+            assert np.allclose(sim.data.geom_xpos[g], [o.xy[0], o.xy[1], 0.75 + half_h])
+    finally:
+        sim.close()
+    with pytest.raises(ValueError):
+        StandingSim(WorldConfig(table=TableConfig(objects=(SceneObject("x", "sphere", (0.1, 0, 0), (1, 1, 1, 1), (0.5, 0)),))))
+
+
 def test_head_camera_sees_the_cup_on_the_public_body():
     assert _red_pixels(BodyConfig()) > 200
 

@@ -28,10 +28,24 @@ from ..robot.loader import ROBOT_PREFIX, BodyConfig, BodyInfo, add_mounted_camer
 CONTROL_HZ = 50.0
 
 
+@dataclass(frozen=True)
+class SceneObject:
+    """A plain object resting on the table. ``size`` follows MuJoCo: a cylinder is
+    (radius, half-height, 0), a box is its three half-extents. Its geom is named
+    ``obj_<name>``; move it at run time through ``model.geom_pos``."""
+
+    name: str
+    shape: str                                   # "cylinder" or "box"
+    size: tuple[float, float, float]
+    rgba: tuple[float, float, float, float]
+    xy: tuple[float, float]
+
+
 @dataclass
 class TableConfig:
-    """A plain table in front of the robot with one red cup on it (positions in the world
-    frame, x forward from the robot's root, metres). Static geometry: nothing on it moves."""
+    """A plain table in front of the robot with a red cup and optional other objects on it
+    (positions in the world frame, x forward from the robot's root, metres). Static
+    geometry: nothing on it moves under physics."""
 
     center: tuple[float, float] = (0.60, 0.0)
     size: tuple[float, float] = (0.6, 1.0)       # depth (x), width (y)
@@ -41,6 +55,7 @@ class TableConfig:
     cup: tuple[float, float] | None = (0.70, 0.05)
     cup_radius: float = 0.04
     cup_height: float = 0.10
+    objects: tuple[SceneObject, ...] = ()
 
 
 @dataclass
@@ -71,6 +86,14 @@ def add_table(spec: mujoco.MjSpec, t: TableConfig) -> None:
                                 pos=[t.cup[0], t.cup[1], t.height + t.cup_height / 2],
                                 size=[t.cup_radius, t.cup_height / 2, 0],
                                 rgba=[0.85, 0.08, 0.08, 1.0], contype=1, conaffinity=1)
+    shapes = {"cylinder": mujoco.mjtGeom.mjGEOM_CYLINDER, "box": mujoco.mjtGeom.mjGEOM_BOX}
+    for o in t.objects:
+        if o.shape not in shapes:
+            raise ValueError(f"object {o.name!r}: shape must be one of {sorted(shapes)}")
+        half_h = o.size[1] if o.shape == "cylinder" else o.size[2]
+        spec.worldbody.add_geom(name=f"obj_{o.name}", type=shapes[o.shape],
+                                pos=[o.xy[0], o.xy[1], t.height + half_h], size=list(o.size),
+                                rgba=list(o.rgba), contype=1, conaffinity=1)
 
 
 def build_world(cfg: WorldConfig) -> tuple[mujoco.MjSpec, BodyInfo]:
